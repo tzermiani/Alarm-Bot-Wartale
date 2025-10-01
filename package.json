@@ -1,0 +1,19 @@
+{
+  "name": "alarm-bot",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/voice": "^0.18.0",
+    "discord.js": "^14.18.0",
+    "express": "^5.1.0",
+    "luxon": "^3.6.1",
+    "pm2": "^6.0.5"
+  }
+}

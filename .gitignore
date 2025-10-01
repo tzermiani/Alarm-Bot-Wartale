@@ -1,0 +1,7 @@
+# ignore ALL .log files
+*.log
+
+# ignore package-lock.json
+package-lock.json
+# ignore ALL files in ANY directory named node_modules
+node_modules/
