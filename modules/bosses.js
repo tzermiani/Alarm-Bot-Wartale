@@ -5,6 +5,15 @@ const { tocarAudio } = require('../utils/audio');
 const { DateTime } = require('luxon');
 
 const bosses = JSON.parse(fs.readFileSync('./bosses.json', 'utf-8'));
+
+// Lista de minutos dos horários dos bosses
+const minutosBoss = [5, 20, 35, 50];
+
+// Campo para controlar última data de mudança dos minutos
+let minutoBossState = {
+  idxMinuto: 0,
+  ultimaData: null
+};
 const bossAlarmsPath = './bossAlarms.json';
 let bossAlarms = new Map();
 
@@ -21,12 +30,28 @@ function salvarBossAlarms() {
 async function handleBossCommands(message, client) {
   const { content, channel } = message;
 
+  if (content.includes('!boss-alarm-minute')) {
+    const partes = content.split(' ');
+    const idx = partes.findIndex(p => p === '!boss-alarm-minute');
+    const minutoStr = partes[idx + 1];
+    const minuto = Number(minutoStr);
+    if (minutosBoss.includes(minuto)) {
+      minutoBossState.idxMinuto = minutosBoss.indexOf(minuto);
+      minutoBossState.ultimaData = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd');
+      channel.send(`⏰ Minuto do boss alterado para ${minutoStr}.`).then(msg => setTimeout(() => msg.delete(), 5000));
+    } else {
+      channel.send(`❌ Minuto inválido. Use um dos seguintes: ${minutosBoss.join(', ')}.`).then(msg => setTimeout(() => msg.delete(), 5000));
+    }
+    return;
+  }
+
   if (content === '!boss-alarm-here') {
     if (!bossAlarms.has(channel.id)) {
       bossAlarms.set(channel.id, true);
       salvarBossAlarms();
     }
     channel.send('✅ Alarme de bosses ativado neste canal!').then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
   }
 
   if (content === '!stop-boss-alarm') {
@@ -35,6 +60,7 @@ async function handleBossCommands(message, client) {
       salvarBossAlarms();
       message.delete();
       channel.send('🛑 Alarme de bosses desativado.').then(msg => setTimeout(() => msg.delete(), 5000));
+      return;
     }
   }
   if(content.includes("!test-boss ")){
@@ -42,30 +68,50 @@ async function handleBossCommands(message, client) {
     const canalDeVoz = message.member.voice.channel;
     if (!canalDeVoz) return message.channel.send('Você precisa estar em um canal de voz!');
     checkBosses(client , time)
+    return;
   }
 }
 
 function checkBosses(client, time) {
   let now = DateTime.now().setZone('America/Sao_Paulo');
 
-  if(time){
+  if (time) {
     const [hour, minute] = time.split(":").map(Number);
     now = now.set({ hour, minute, second: 0, millisecond: 0 });
   }
+
+  // Verifica se precisa mudar o minuto
+  const dataAtual = now.toFormat('yyyy-MM-dd');
+  if (minutoBossState.ultimaData !== dataAtual && now.hour >= 19) {
+    // Incrementa o índice de minutos
+    minutoBossState.idxMinuto = (minutoBossState.idxMinuto + 1) % minutosBoss.length;
+    minutoBossState.ultimaData = dataAtual;
+  }
+
+  const idxMinuto = minutoBossState.idxMinuto;
+  const minuto = minutosBoss[(idxMinuto) % minutosBoss.length].toString().padStart(2, '0')
+  
+  const bossWithHour = bosses.map(boss =>{
+    return {
+      nome: boss.nome,
+      horarios: boss.horarios.map(horario => `${horario}:${minuto}`)
+    }
+  })
+
   const horaAtual = now.toFormat('HH:mm');
   const hora2Min = now.plus({ minutes: 2 }).toFormat('HH:mm');
   const hora5Min = now.plus({ minutes: 5 }).toFormat('HH:mm');
-
+  
   for (const [canalId] of bossAlarms) {
     const canal = client.channels.cache.get(canalId);
     if (!canal) continue;
 
-    const bosses5min = bosses.filter(b => b.horarios.includes(hora5Min));
-    const bosses2min = bosses.filter(b => b.horarios.includes(hora2Min));
-    const bossesNow = bosses.filter(b => b.horarios.includes(horaAtual));
+    const bosses5min = bossWithHour.filter(b => b.horarios.includes(hora5Min));
+    const bosses2min = bossWithHour.filter(b => b.horarios.includes(hora2Min));
+    const bossesNow = bossWithHour.filter(b => b.horarios.includes(horaAtual));
 
     if (bosses5min.length > 0) tocarAlertaComBosses(canal, bosses5min, '5-minutos');
-    if (bosses2min.length > 0) tocarAlertaComBosses(canal, bosses2min , '2-minutos');
+    if (bosses2min.length > 0) tocarAlertaComBosses(canal, bosses2min, '2-minutos');
     if (bossesNow.length > 0) {
       tocarAlertaComBosses(canal, bossesNow);
 

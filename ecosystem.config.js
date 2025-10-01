@@ -1,7 +1,7 @@
 module.exports = {
   apps: [
     {
-      name: "meu-app",
+      name: "bot-discord-wartale",
       script: "index.js",
       instances: 1,
       autorestart: true,
