@@ -37,7 +37,14 @@ async function handleBossCommands(message, client) {
     const minuto = Number(minutoStr);
     if (minutosBoss.includes(minuto)) {
       minutoBossState.idxMinuto = minutosBoss.indexOf(minuto);
-      minutoBossState.ultimaData = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd');
+
+      //Se a hora for maior que 19, atualiza a data para hoje, senão para ontem
+      if(DateTime.now().setZone('America/Sao_Paulo').hour >= 19){
+        minutoBossState.ultimaData = DateTime.now().setZone('America/Sao_Paulo').toFormat('yyyy-MM-dd');
+      }else{
+        minutoBossState.ultimaData = DateTime.now().setZone('America/Sao_Paulo').minus({ days: 1 }).toFormat('yyyy-MM-dd');
+      }
+
       channel.send(`⏰ Minuto do boss alterado para ${minutoStr}.`).then(msg => setTimeout(() => msg.delete(), 5000));
     } else {
       channel.send(`❌ Minuto inválido. Use um dos seguintes: ${minutosBoss.join(', ')}.`).then(msg => setTimeout(() => msg.delete(), 5000));
@@ -110,14 +117,14 @@ function checkBosses(client, time) {
     const bosses2min = bossWithHour.filter(b => b.horarios.includes(hora2Min));
     const bossesNow = bossWithHour.filter(b => b.horarios.includes(horaAtual));
 
-    if (bosses5min.length > 0) tocarAlertaComBosses(canal, bosses5min, '5-minutos');
+    //if (bosses5min.length > 0) tocarAlertaComBosses(canal, bosses5min, '5-minutos');
     if (bosses2min.length > 0) tocarAlertaComBosses(canal, bosses2min, '2-minutos');
-    if (bossesNow.length > 0) {
+    /*if (bossesNow.length > 0) {
       tocarAlertaComBosses(canal, bossesNow);
 
       const mensagem = bossesNow.map(b => `🚨 **${b.nome}** apareceu agora em **${b.local || 'local desconhecido'}**!`).join('\n');
       canal.send(mensagem).then(m => setTimeout(() => m.delete(), 60000));
-    }
+    }*/
   }
 }
 
@@ -206,4 +213,63 @@ fs.writeFileSync(inputListPath, linhas.join('\n'));
   fs.unlinkSync(inputListPath);
 }
 
-module.exports = { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses };
+let lastAlertaHg = 60; //minutos
+
+//funcao checkHGTime
+function checkHGTime() {
+  //faz um get na api do wartale para pegar o horario do hg
+  //https://www.wartaletools.com/api 
+  const axios = require('axios');
+  var config =  {
+    "headers": {
+      "accept": "application/json, text/plain, */*",
+      "accept-language": "pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
+      "en": "gsi",
+      "priority": "u=1, i",
+      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Microsoft Edge\";v=\"140\"",
+      "sec-ch-ua-mobile": "?0",
+      "sec-ch-ua-platform": "\"Windows\"",
+      "sec-fetch-dest": "empty",
+      "sec-fetch-mode": "cors","sec-fetch-site": "same-origin",
+      "Referer": "https://www.wartaletools.com/boss"},
+  "body": null,
+  "method": "GET"
+};
+
+  axios.get('https://www.wartaletools.com/api', config)
+    .then(response => {
+      // Espera-se que o response.data.results[0].value.Ares.HellsGateNextRound seja um inteiro representando os segundos faltando para o próximo HG
+      const hgTimeSpan = response.data?.results?.[0]?.value?.Ares?.HellsGateNextRound;
+      if (!hgTimeSpan) {
+        console.log('Não foi possível obter o horário do HG.');
+        return;
+      }
+
+      let alerta = null;
+      //verifica quantos segundos faltam para o hgTimeSpan 
+      if (hgTimeSpan <= 300 && lastAlertaHg > 5) { //5 minutos  
+        lastAlertaHg = 5;
+        alerta = '⏰ Falta 5 minutos para o Hell\'s Gate!';
+      }else if (lastAlertaHg === 5 && hgTimeSpan > 60) { //reseta o ultimo alerta se o hgTimeSpan for maior que 60 minutos
+        lastAlertaHg = 100;
+      }
+
+      if (alerta) {
+        // Envie o alerta para todos os canais cadastrados
+        for (const [canalId] of bossAlarms) {
+          const canal = global.discordClient?.channels?.cache?.get(canalId);
+          if (canal) {
+            canal.send(`🚨 ${alerta}`);
+          }
+        }
+        console.log(alerta);
+      } else {
+        console.log(`Horário do HG: ${hgTimeSpan}`);
+      }
+    })
+    .catch(error => {
+      console.error('Erro ao buscar horário do HG:', error);
+    });
+}
+
+module.exports = { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses, checkHGTime };

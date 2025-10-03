@@ -1,7 +1,7 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
 const { tocarAudio } = require('./utils/audio');
-const { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses } = require('./modules/bosses');
+const { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses, checkHGTime } = require('./modules/bosses');
 const { mapAlarms, checkMapas, handleMapCommands, responderProximosMapas } = require('./modules/mapas');
 
 
@@ -24,6 +24,7 @@ client.once('ready', () => {
   setInterval(() => {
     checkBosses(client);
     checkMapas(client);
+    checkHGTime(client);
   }, 60 * 1000);
 });
 
