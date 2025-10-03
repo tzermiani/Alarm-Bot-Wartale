@@ -216,7 +216,7 @@ fs.writeFileSync(inputListPath, linhas.join('\n'));
 let lastAlertaHg = 60; //minutos
 
 //funcao checkHGTime
-function checkHGTime() {
+function checkHGTime(client) {
   //faz um get na api do wartale para pegar o horario do hg
   //https://www.wartaletools.com/api 
   const axios = require('axios');
@@ -257,15 +257,14 @@ function checkHGTime() {
       if (alerta) {
         // Envie o alerta para todos os canais cadastrados
         for (const [canalId] of bossAlarms) {
-          const canal = global.discordClient?.channels?.cache?.get(canalId);
-          if (canal) {
-            canal.send(`🚨 ${alerta}`);
-          }
+          const canal = client.channels.cache.get(canalId);
+          if (!canal) continue;
+          
+          let audio = './audios/HG-5minutos-LULA.mp3';
+          tocarAudio(canal, audio);
+          
         }
-        console.log(alerta);
-      } else {
-        console.log(`Horário do HG: ${hgTimeSpan}`);
-      }
+      } 
     })
     .catch(error => {
       console.error('Erro ao buscar horário do HG:', error);
