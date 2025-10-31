@@ -213,7 +213,7 @@ fs.writeFileSync(inputListPath, linhas.join('\n'));
   fs.unlinkSync(inputListPath);
 }
 
-let lastAlertaHg = 60; //minutos
+let lastAlertaHg = true; //minutos
 
 //funcao checkHGTime
 function checkHGTime(client) {
@@ -247,11 +247,13 @@ function checkHGTime(client) {
 
       let alerta = null;
       //verifica quantos segundos faltam para o hgTimeSpan 
-      if (hgTimeSpan <= 300 && lastAlertaHg > 5) { //5 minutos  
-        lastAlertaHg = 5;
-        alerta = '⏰ Falta 5 minutos para o Hell\'s Gate!';
-      }else if (lastAlertaHg === 5 && hgTimeSpan > 60) { //reseta o ultimo alerta se o hgTimeSpan for maior que 60 minutos
-        lastAlertaHg = 100;
+      if (hgTimeSpan <= 300) { //5 minutos  
+        if(!lastAlertaHg){
+          lastAlertaHg = true;
+          alerta = '⏰ Falta 5 minutos para o Hell\'s Gate!';
+        }
+      }else if (lastAlertaHg && hgTimeSpan > 600) { //reseta o ultimo alerta se o hgTimeSpan for maior que 60 minutos
+        lastAlertaHg = false;
       }
 
       if (alerta) {
