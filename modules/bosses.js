@@ -222,16 +222,22 @@ function checkHGTime(client) {
   const axios = require('axios');
   var config =  {
     "headers": {
-      "accept": "application/json, text/plain, */*",
-      "accept-language": "pt-BR,pt;q=0.9,en;q=0.8,en-GB;q=0.7,en-US;q=0.6",
-      "en": "gsi",
-      "priority": "u=1, i",
-      "sec-ch-ua": "\"Chromium\";v=\"140\", \"Not=A?Brand\";v=\"24\", \"Microsoft Edge\";v=\"140\"",
-      "sec-ch-ua-mobile": "?0",
-      "sec-ch-ua-platform": "\"Windows\"",
-      "sec-fetch-dest": "empty",
-      "sec-fetch-mode": "cors","sec-fetch-site": "same-origin",
-      "Referer": "https://www.wartaletools.com/boss"},
+      "authority":"wartaletools.com",
+      "accept":"application/json, text/plain, */*",
+      //"accept-encoding":"gzip, deflate, br, zstd",
+      "accept-language":"pt-BR,pt;q=0.9,en-US;q=0.8,en;q=0.7",
+      "cookie":"_ga=GA1.1.1509123113.1759413058; _ga_6F0240X7XF=GS2.1.s1763608841$o2$g0$t1763608841$j60$l0$h0; __gads=ID=9d5a5f1df684b887:T=1759413058:RT=1763608842:S=ALNI_MZLR_0Z2NVxJ4H0n-qSgy6lHYi0yA; __gpi=UID=00001297745ee50e:T=1759413058:RT=1763608842:S=ALNI_MaCINE2b3tnK2xgO6sxELKaakVkxA; __eoi=ID=563ccd38db838bb3:T=1759413058:RT=1763608842:S=AA-AfjbID7s0QQG96Ig3uPVO4otQ",
+      "en":"gsi",
+      "priority":"u=1, i",
+      "referer":"https://wartaletools.com/boss",
+      "sec-ch-ua":'"Chromium";v="142", "Google Chrome";v="142", "Not_A Brand";v="99"',
+      "sec-ch-ua-mobile":"?0",
+      "sec-ch-ua-platform":"Windows",
+      "sec-fetch-dest":"empty",
+      "sec-fetch-mode":"cors",
+      "sec-fetch-site":"same-origin",
+      "user-agent":"Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/142.0.0.0 Safari/537.36"
+    },
   "body": null,
   "method": "GET"
 };
