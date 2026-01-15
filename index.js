@@ -1,8 +1,8 @@
 const { Client, GatewayIntentBits } = require('discord.js');
 const fs = require('fs');
 const { tocarAudio } = require('./utils/audio');
-const { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses, checkHGTime } = require('./modules/bosses');
-const { mapAlarms, checkMapas, handleMapCommands, responderProximosMapas } = require('./modules/mapas');
+const { checkBosses, handleBossCommands, responderProximosBosses, checkHGTime, migrarAlarmsAntigos } = require('./modules/bosses');
+const { checkMapas, handleMapCommands, responderProximosMapas } = require('./modules/mapas');
 
 
 // Carrega configuração conforme ambiente
@@ -21,6 +21,10 @@ const client = new Client({
 
 client.once('ready', () => {
   console.log(`🤖 Bot online como ${client.user.tag}`);
+  
+  // Migrar arquivos antigos para o novo sistema de guilds
+  migrarAlarmsAntigos(client);
+  
   setInterval(() => {
     checkBosses(client);
     checkMapas(client);
