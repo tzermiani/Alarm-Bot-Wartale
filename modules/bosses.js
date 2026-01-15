@@ -14,21 +14,122 @@ let minutoBossState = {
   idxMinuto: 0,
   ultimaData: null
 };
-const bossAlarmsPath = './bossAlarms.json';
-let bossAlarms = new Map();
 
-if (fs.existsSync(bossAlarmsPath)) {
-  const canais = JSON.parse(fs.readFileSync(bossAlarmsPath));
-  canais.forEach(id => bossAlarms.set(id, true));
+// Sistema de configuração por Guild
+const guildsPath = './guilds.json';
+let guilds = {};
+
+function carregarGuilds() {
+  if (fs.existsSync(guildsPath)) {
+    guilds = JSON.parse(fs.readFileSync(guildsPath, 'utf-8'));
+  }
 }
 
-function salvarBossAlarms() {
-  const canais = Array.from(bossAlarms.keys());
-  fs.writeFileSync(bossAlarmsPath, JSON.stringify(canais, null, 2));
+function salvarGuilds() {
+  fs.writeFileSync(guildsPath, JSON.stringify(guilds, null, 2));
 }
+
+function getGuildConfig(guildId) {
+  return guilds[guildId] || null;
+}
+
+function updateGuildConfig(guildId, config) {
+  guilds[guildId] = {
+    ...guilds[guildId],
+    ...config,
+    servidor: guildId
+  };
+  salvarGuilds();
+}
+
+// Carregar configurações ao iniciar
+carregarGuilds();
+
+// Migração automática dos arquivos antigos
+function migrarAlarmsAntigos(client) {
+  const bossAlarmsPath = './bossAlarms.json';
+  const mapAlarmsPath = './mapAlarms.json';
+  let migrados = false;
+
+  // Migrar bossAlarms.json
+  if (fs.existsSync(bossAlarmsPath)) {
+    const canaisAntigos = JSON.parse(fs.readFileSync(bossAlarmsPath, 'utf-8'));
+    
+    for (const canalId of canaisAntigos) {
+      const canal = client.channels.cache.get(canalId);
+      if (!canal || !canal.guild) continue;
+      
+      const guildId = canal.guild.id;
+      const config = getGuildConfig(guildId);
+      
+      if (!config) {
+        updateGuildConfig(guildId, {
+          nome: canal.guild.name,
+          canalBoss: canalId,
+          bossChannels: [],
+          mapChannels: [],
+          timeboss: [3, 5],
+          timemap: [3]
+        });
+        migrados = true;
+        console.log(`✅ Migrado boss alarm: ${canal.guild.name} -> #${canal.name}`);
+      } else if (!config.canalBoss) {
+        updateGuildConfig(guildId, { canalBoss: canalId });
+        migrados = true;
+        console.log(`✅ Atualizado canal boss: ${canal.guild.name} -> #${canal.name}`);
+      }
+    }
+    
+    // Renomear arquivo antigo para backup
+    fs.renameSync(bossAlarmsPath, `${bossAlarmsPath}.backup`);
+    console.log('📦 Backup criado: bossAlarms.json.backup');
+  }
+
+  // Migrar mapAlarms.json
+  if (fs.existsSync(mapAlarmsPath)) {
+    const canaisAntigos = JSON.parse(fs.readFileSync(mapAlarmsPath, 'utf-8'));
+    
+    for (const canalId of canaisAntigos) {
+      const canal = client.channels.cache.get(canalId);
+      if (!canal || !canal.guild) continue;
+      
+      const guildId = canal.guild.id;
+      const config = getGuildConfig(guildId);
+      
+      if (!config) {
+        updateGuildConfig(guildId, {
+          nome: canal.guild.name,
+          canalMapa: canalId,
+          bossChannels: [],
+          mapChannels: [],
+          timeboss: [3, 5],
+          timemap: [3]
+        });
+        migrados = true;
+        console.log(`✅ Migrado map alarm: ${canal.guild.name} -> #${canal.name}`);
+      } else if (!config.canalMapa) {
+        updateGuildConfig(guildId, { canalMapa: canalId });
+        migrados = true;
+        console.log(`✅ Atualizado canal mapa: ${canal.guild.name} -> #${canal.name}`);
+      }
+    }
+    
+    // Renomear arquivo antigo para backup
+    fs.renameSync(mapAlarmsPath, `${mapAlarmsPath}.backup`);
+    console.log('📦 Backup criado: mapAlarms.json.backup');
+  }
+
+  if (migrados) {
+    console.log('🎉 Migração concluída! Configurações salvas em guilds.json');
+  }
+}
+
 
 async function handleBossCommands(message, client) {
-  const { content, channel } = message;
+  const { content, channel, guild } = message;
+  const guildId = guild?.id;
+
+  if (!guildId) return;
 
   if (content.includes('!boss-alarm-minute')) {
     const partes = content.split(' ');
@@ -53,22 +154,210 @@ async function handleBossCommands(message, client) {
   }
 
   if (content === '!boss-alarm-here') {
-    if (!bossAlarms.has(channel.id)) {
-      bossAlarms.set(channel.id, true);
-      salvarBossAlarms();
+    const config = getGuildConfig(guildId);
+    if (!config) {
+      // Criar configuração padrão para a guild
+      updateGuildConfig(guildId, {
+        nome: guild.name,
+        canalBoss: channel.id,
+        bossChannels: [],
+        mapChannels: [],
+        timeboss: [3, 5],
+        timemap: [3]
+      });
+      channel.send('✅ Alarme de bosses ativado neste servidor!').then(msg => setTimeout(() => msg.delete(), 5000));
+    } else {
+      updateGuildConfig(guildId, { canalBoss: channel.id });
+      channel.send('✅ Canal de alarme de bosses atualizado!').then(msg => setTimeout(() => msg.delete(), 5000));
     }
-    channel.send('✅ Alarme de bosses ativado neste canal!').then(msg => setTimeout(() => msg.delete(), 5000));
     return;
   }
 
   if (content === '!stop-boss-alarm') {
-    if (bossAlarms.has(channel.id)) {
-      bossAlarms.delete(channel.id);
-      salvarBossAlarms();
+    const config = getGuildConfig(guildId);
+    if (config && config.canalBoss) {
+      updateGuildConfig(guildId, { canalBoss: null });
       message.delete();
       channel.send('🛑 Alarme de bosses desativado.').then(msg => setTimeout(() => msg.delete(), 5000));
       return;
     }
+  }
+
+  if (content === '!config-guild') {
+    const config = getGuildConfig(guildId);
+    if (!config) {
+      channel.send('❌ Servidor não configurado. Use `!boss-alarm-here` ou `!map-alarm-here` para configurar.');
+      return;
+    }
+    
+    const canalBoss = config.canalBoss ? `<#${config.canalBoss}>` : 'Não configurado';
+    const canalMapa = config.canalMapa ? `<#${config.canalMapa}>` : 'Não configurado';
+    const timeboss = config.timeboss?.join(', ') || 'Não configurado';
+    const timemap = config.timemap?.join(', ') || 'Não configurado';
+    
+    const bossChannels = config.bossChannels || [];
+    const mapChannels = config.mapChannels || [];
+    const bossVoiceList = bossChannels.length > 0 
+      ? bossChannels.map(id => {
+          const vc = client.channels.cache.get(id);
+          return vc ? vc.name : `ID: ${id}`;
+        }).join(', ')
+      : 'Nenhum configurado';
+    const mapVoiceList = mapChannels.length > 0
+      ? mapChannels.map(id => {
+          const vc = client.channels.cache.get(id);
+          return vc ? vc.name : `ID: ${id}`;
+        }).join(', ')
+      : 'Nenhum configurado';
+    
+    const mensagem = `⚙️ **Configurações do Servidor: ${config.nome}**\n\n` +
+      `🔔 **Canal Texto Boss:** ${canalBoss}\n` +
+      `🔊 **Canais Voz Boss:** ${bossVoiceList}\n` +
+      `⏰ **Tempos Boss (min):** ${timeboss}\n\n` +
+      `🗺️ **Canal Texto Mapa:** ${canalMapa}\n` +
+      `🔊 **Canais Voz Mapa:** ${mapVoiceList}\n` +
+      `⏰ **Tempos Mapa (min):** ${timemap}\n\n` +
+      `**Comandos disponíveis:**\n` +
+      `\`!set-timeboss 2 5 10\` - Define tempos de alerta para bosses\n` +
+      `\`!set-timemap 3 5\` - Define tempos de alerta para mapas\n` +
+      `\`!add-boss-voice\` - Adiciona canal de voz atual para bosses\n` +
+      `\`!remove-boss-voice\` - Remove canal de voz atual de bosses\n` +
+      `\`!add-map-voice\` - Adiciona canal de voz atual para mapas\n` +
+      `\`!remove-map-voice\` - Remove canal de voz atual de mapas`;
+    
+    channel.send(mensagem);
+    return;
+  }
+
+  if (content.includes('!set-timeboss')) {
+    const partes = content.split(' ').slice(1);
+    const tempos = partes.map(Number).filter(n => !isNaN(n) && n >= 0);
+    
+    if (tempos.length === 0) {
+      channel.send('❌ Uso: `!set-timeboss 2 5 10` (números de minutos separados por espaço)');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    if (!config) {
+      updateGuildConfig(guildId, {
+        nome: guild.name,
+        timeboss: tempos,
+        timemap: [3]
+      });
+    } else {
+      updateGuildConfig(guildId, { timeboss: tempos });
+    }
+    
+    channel.send(`✅ Tempos de alerta de boss atualizados: ${tempos.join(', ')} minutos`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
+  }
+
+  if (content.includes('!set-timemap')) {
+    const partes = content.split(' ').slice(1);
+    const tempos = partes.map(Number).filter(n => !isNaN(n) && n >= 0);
+    
+    if (tempos.length === 0) {
+      channel.send('❌ Uso: `!set-timemap 3 5` (números de minutos separados por espaço)');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    if (!config) {
+      updateGuildConfig(guildId, {
+        nome: guild.name,
+        timeboss: [3, 5],
+        timemap: tempos
+      });
+    } else {
+      updateGuildConfig(guildId, { timemap: tempos });
+    }
+    
+    channel.send(`✅ Tempos de alerta de mapa atualizados: ${tempos.join(', ')} minutos`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
+  }
+  if (content === '!add-boss-voice') {
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      channel.send('❌ Você precisa estar em um canal de voz!');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    const bossChannels = config?.bossChannels || [];
+    
+    if (bossChannels.includes(voiceChannel.id)) {
+      channel.send('⚠️ Este canal de voz já está configurado para alarmes de boss.');
+      return;
+    }
+    
+    bossChannels.push(voiceChannel.id);
+    updateGuildConfig(guildId, { bossChannels, nome: guild.name });
+    channel.send(`✅ Canal de voz **${voiceChannel.name}** adicionado para alarmes de boss!`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
+  }
+
+  if (content === '!remove-boss-voice') {
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      channel.send('❌ Você precisa estar em um canal de voz!');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    let bossChannels = config?.bossChannels || [];
+    
+    if (!bossChannels.includes(voiceChannel.id)) {
+      channel.send('⚠️ Este canal de voz não está configurado para alarmes de boss.');
+      return;
+    }
+    
+    bossChannels = bossChannels.filter(id => id !== voiceChannel.id);
+    updateGuildConfig(guildId, { bossChannels });
+    channel.send(`✅ Canal de voz **${voiceChannel.name}** removido dos alarmes de boss!`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
+  }
+
+  if (content === '!add-map-voice') {
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      channel.send('❌ Você precisa estar em um canal de voz!');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    const mapChannels = config?.mapChannels || [];
+    
+    if (mapChannels.includes(voiceChannel.id)) {
+      channel.send('⚠️ Este canal de voz já está configurado para alarmes de mapa.');
+      return;
+    }
+    
+    mapChannels.push(voiceChannel.id);
+    updateGuildConfig(guildId, { mapChannels, nome: guild.name });
+    channel.send(`✅ Canal de voz **${voiceChannel.name}** adicionado para alarmes de mapa!`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
+  }
+
+  if (content === '!remove-map-voice') {
+    const voiceChannel = message.member.voice.channel;
+    if (!voiceChannel) {
+      channel.send('❌ Você precisa estar em um canal de voz!');
+      return;
+    }
+    
+    const config = getGuildConfig(guildId);
+    let mapChannels = config?.mapChannels || [];
+    
+    if (!mapChannels.includes(voiceChannel.id)) {
+      channel.send('⚠️ Este canal de voz não está configurado para alarmes de mapa.');
+      return;
+    }
+    
+    mapChannels = mapChannels.filter(id => id !== voiceChannel.id);
+    updateGuildConfig(guildId, { mapChannels });
+    channel.send(`✅ Canal de voz **${voiceChannel.name}** removido dos alarmes de mapa!`).then(msg => setTimeout(() => msg.delete(), 5000));
+    return;
   }
   if(content.includes("!test-boss ")){
     let time = content.replace("!test-boss ", "")
@@ -106,25 +395,59 @@ function checkBosses(client, time) {
   })
 
   const horaAtual = now.toFormat('HH:mm');
-  const hora2Min = now.plus({ minutes: 2 }).toFormat('HH:mm');
-  const hora5Min = now.plus({ minutes: 5 }).toFormat('HH:mm');
   
-  for (const [canalId] of bossAlarms) {
-    const canal = client.channels.cache.get(canalId);
+  // Itera sobre as guilds configuradas
+  for (const [guildId, guildConfig] of Object.entries(guilds)) {
+    if (!guildConfig.canalBoss) continue;
+    
+    const canal = client.channels.cache.get(guildConfig.canalBoss);
     if (!canal) continue;
 
-    const bosses5min = bossWithHour.filter(b => b.horarios.includes(hora5Min));
-    const bosses2min = bossWithHour.filter(b => b.horarios.includes(hora2Min));
+    const timeboss = guildConfig.timeboss || [3, 5];
+    const bossChannels = guildConfig.bossChannels || [];
+    
+    // Para cada tempo de alerta configurado na guild
+    for (const minutos of timeboss) {
+      const horaAlerta = now.plus({ minutes: minutos }).toFormat('HH:mm');
+      const bossesAlerta = bossWithHour.filter(b => b.horarios.includes(horaAlerta));
+      
+      if (bossesAlerta.length > 0) {
+        
+        const avisoLabel = `${minutos}-minutos`;
+        
+        // Tocar áudio em cada canal de voz configurado
+        for (const voiceChannelId of bossChannels) {
+          const voiceChannel = client.channels.cache.get(voiceChannelId);
+          if (!voiceChannel) continue;
+          
+          // Verifica se há membros no canal (excluindo bots)
+          const membersCount = voiceChannel.members.filter(m => !m.user.bot).size;
+          if (membersCount === 0) {
+            console.log(`⏭️ Pulando canal ${voiceChannel.name} - sem membros`);
+            continue;
+          }
+          
+          tocarAlertaComBosses(voiceChannel, bossesAlerta, avisoLabel, minutos);
+        }
+      }
+    }
+    
+    // Verifica spawns no horário atual (opcional)
     const bossesNow = bossWithHour.filter(b => b.horarios.includes(horaAtual));
-
-    //if (bosses5min.length > 0) tocarAlertaComBosses(canal, bosses5min, '5-minutos');
-    if (bosses2min.length > 0) tocarAlertaComBosses(canal, bosses2min, '2-minutos');
-    /*if (bossesNow.length > 0) {
-      tocarAlertaComBosses(canal, bossesNow);
-
-      const mensagem = bossesNow.map(b => `🚨 **${b.nome}** apareceu agora em **${b.local || 'local desconhecido'}**!`).join('\n');
+    if (bossesNow.length > 0 && timeboss.includes(0)) {
+      for (const voiceChannelId of bossChannels) {
+        const voiceChannel = client.channels.cache.get(voiceChannelId);
+        if (!voiceChannel) continue;
+        
+        const membersCount = voiceChannel.members.filter(m => !m.user.bot).size;
+        if (membersCount === 0) continue;
+        
+        tocarAlertaComBosses(voiceChannel, bossesNow, 'nascendo', 0);
+      }
+      
+      const mensagem = bossesNow.map(b => `🚨 **${b.nome}** apareceu agora!`).join('\n');
       canal.send(mensagem).then(m => setTimeout(() => m.delete(), 60000));
-    }*/
+    }
   }
 }
 
@@ -149,7 +472,7 @@ function responderProximosBosses(message) {
   message.channel.send(`📅 Próximos bosses da próxima hora:\n${texto}`);
 }
 
-async function tocarAlertaComBosses(canal, bosses, aviso) {
+async function tocarAlertaComBosses(canal, bosses, aviso, minutos) {
   const { tocarAudio } = require('../utils/audio');
   const fs = require('fs');
   const { execSync } = require('child_process');
@@ -159,11 +482,17 @@ async function tocarAlertaComBosses(canal, bosses, aviso) {
     case '5-minutos':
       avisoFile = 'alerta-boss-5-minutos.mp3'
       break;
-      case '2-minutos':
-        avisoFile = 'alerta-boss-2-minutos.mp3'
-        break;
-      default:
-        avisoFile = 'alerta-boss-nascendo.mp3'
+    case '2-minutos':
+      avisoFile = 'alerta-boss-2-minutos.mp3'
+      break;
+    case 'nascendo':
+      avisoFile = 'alerta-boss-nascendo.mp3'
+      break;
+    default:
+      // Para tempos customizados, tenta usar arquivo específico ou usa o de 2 minutos como fallback
+      avisoFile = fs.existsSync(`./audios/alerta-boss-${minutos}-minutos.mp3`) 
+        ? `alerta-boss-${minutos}-minutos.mp3`
+        : 'alerta-boss-2-minutos.mp3'
   }
 
   if (!fs.existsSync('./audios/cache')) {
@@ -263,14 +592,25 @@ function checkHGTime(client) {
       }
 
       if (alerta) {
-        // Envie o alerta para todos os canais cadastrados
-        for (const [canalId] of bossAlarms) {
-          const canal = client.channels.cache.get(canalId);
-          if (!canal) continue;
+        // Envie o alerta para todas as guilds cadastradas
+        for (const [guildId, guildConfig] of Object.entries(guilds)) {
+          const bossChannels = guildConfig.bossChannels || [];
           
           let audio = './audios/HG-5minutos-LULA.mp3';
-          tocarAudio(canal, audio);
           
+          for (const voiceChannelId of bossChannels) {
+            const voiceChannel = client.channels.cache.get(voiceChannelId);
+            if (!voiceChannel) continue;
+            
+            // Verifica se há membros no canal (excluindo bots)
+            const membersCount = voiceChannel.members.filter(m => !m.user.bot).size;
+            if (membersCount === 0) {
+              console.log(`⏭️ Pulando HG alert - canal ${voiceChannel.name} sem membros`);
+              continue;
+            }
+            
+            tocarAudio(voiceChannel, audio);
+          }
         }
       } 
     })
@@ -279,4 +619,4 @@ function checkHGTime(client) {
     });
 }
 
-module.exports = { bossAlarms, checkBosses, handleBossCommands, responderProximosBosses, checkHGTime };
+module.exports = { checkBosses, handleBossCommands, responderProximosBosses, checkHGTime, getGuildConfig, updateGuildConfig, carregarGuilds, migrarAlarmsAntigos };

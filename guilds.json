@@ -1,0 +1,47 @@
+{
+  "exemplo_guild_id": {
+    "nome": "Servidor Exemplo",
+    "servidor": "exemplo_guild_id",
+    "canalBoss": null,
+    "canalMapa": null,
+    "bossChannels": [],
+    "mapChannels": [],
+    "timeboss": [
+      3,
+      5
+    ],
+    "timemap": [
+      3
+    ]
+  },
+  "1161734158620573776": {
+    "nome": "Servidor de ThiagoZermiani",
+    "canalBoss": "1161734159308427358",
+    "canalMapa": "1161734159308427358",
+    "bossChannels": [],
+    "mapChannels": [],
+    "timeboss": [
+      3,
+      5
+    ],
+    "timemap": [
+      3
+    ],
+    "servidor": "1161734158620573776"
+  },
+  "1270525732585738292": {
+    "nome": "MAFIA",
+    "canalBoss": "1292905919457263728",
+    "canalMapa": null,
+    "bossChannels": ["1292905919457263728"],
+    "mapChannels": [],
+    "timeboss": [
+      3,
+      5
+    ],
+    "timemap": [
+      3
+    ],
+    "servidor": "1270525732585738292"
+  }
+}
