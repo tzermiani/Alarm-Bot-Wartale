@@ -396,6 +396,9 @@ function checkBosses(client, time) {
 
   const horaAtual = now.toFormat('HH:mm');
   
+  // Controle para evitar tocar áudio duplicado no mesmo canal
+  const canaisJaTocados = new Set();
+  
   // Itera sobre as guilds configuradas
   for (const [guildId, guildConfig] of Object.entries(guilds)) {
     if (!guildConfig.canalBoss) continue;
@@ -417,6 +420,15 @@ function checkBosses(client, time) {
         
         // Tocar áudio em cada canal de voz configurado
         for (const voiceChannelId of bossChannels) {
+          // Criar chave única para este alerta específico (canal + horário + minutos)
+          const chaveAlerta = `${voiceChannelId}-${horaAlerta}-${minutos}`;
+          
+          // Pula se já tocou neste canal para este alerta
+          if (canaisJaTocados.has(chaveAlerta)) {
+            console.log(`⏭️ Pulando canal duplicado - já tocou este alerta`);
+            continue;
+          }
+          
           const voiceChannel = client.channels.cache.get(voiceChannelId);
           if (!voiceChannel) continue;
           
@@ -427,6 +439,9 @@ function checkBosses(client, time) {
             continue;
           }
           
+          // Marca como já tocado
+          canaisJaTocados.add(chaveAlerta);
+          
           tocarAlertaComBosses(voiceChannel, bossesAlerta, avisoLabel, minutos);
         }
       }
@@ -436,12 +451,20 @@ function checkBosses(client, time) {
     const bossesNow = bossWithHour.filter(b => b.horarios.includes(horaAtual));
     if (bossesNow.length > 0 && timeboss.includes(0)) {
       for (const voiceChannelId of bossChannels) {
+        // Criar chave única para spawn atual
+        const chaveAlerta = `${voiceChannelId}-${horaAtual}-spawn`;
+        
+        if (canaisJaTocados.has(chaveAlerta)) {
+          continue;
+        }
+        
         const voiceChannel = client.channels.cache.get(voiceChannelId);
         if (!voiceChannel) continue;
         
         const membersCount = voiceChannel.members.filter(m => !m.user.bot).size;
         if (membersCount === 0) continue;
         
+        canaisJaTocados.add(chaveAlerta);
         tocarAlertaComBosses(voiceChannel, bossesNow, 'nascendo', 0);
       }
       
@@ -592,6 +615,9 @@ function checkHGTime(client) {
       }
 
       if (alerta) {
+        // Controle para evitar tocar áudio duplicado no mesmo canal
+        const canaisJaTocados = new Set();
+        
         // Envie o alerta para todas as guilds cadastradas
         for (const [guildId, guildConfig] of Object.entries(guilds)) {
           const bossChannels = guildConfig.bossChannels || [];
@@ -599,6 +625,12 @@ function checkHGTime(client) {
           let audio = './audios/HG-5minutos-LULA.mp3';
           
           for (const voiceChannelId of bossChannels) {
+            // Pula se já tocou neste canal
+            if (canaisJaTocados.has(voiceChannelId)) {
+              console.log(`⏭️ Pulando HG alert - canal duplicado`);
+              continue;
+            }
+            
             const voiceChannel = client.channels.cache.get(voiceChannelId);
             if (!voiceChannel) continue;
             
@@ -608,6 +640,9 @@ function checkHGTime(client) {
               console.log(`⏭️ Pulando HG alert - canal ${voiceChannel.name} sem membros`);
               continue;
             }
+            
+            // Marca como já tocado
+            canaisJaTocados.add(voiceChannelId);
             
             tocarAudio(voiceChannel, audio);
           }

@@ -53,6 +53,9 @@ function checkMapas(client) {
     guilds = JSON.parse(fs.readFileSync(guildsPath, 'utf-8'));
   }
 
+  // Controle para evitar tocar áudio duplicado no mesmo canal
+  const canaisJaTocados = new Set();
+
   for (const [guildId, guildConfig] of Object.entries(guilds)) {
     if (!guildConfig.canalMapa) continue;
     
@@ -77,6 +80,15 @@ function checkMapas(client) {
         
         // Tocar áudio em cada canal de voz configurado
         for (const voiceChannelId of mapChannels) {
+          // Criar chave única para este alerta específico (canal + horário + minutos)
+          const chaveAlerta = `${voiceChannelId}-${horaAlerta}-${minutos}`;
+          
+          // Pula se já tocou neste canal para este alerta
+          if (canaisJaTocados.has(chaveAlerta)) {
+            console.log(`⏭️ Pulando canal duplicado - já tocou este alerta de mapa`);
+            continue;
+          }
+          
           const voiceChannel = client.channels.cache.get(voiceChannelId);
           if (!voiceChannel) continue;
           
@@ -87,6 +99,9 @@ function checkMapas(client) {
             continue;
           }
           
+          // Marca como já tocado
+          canaisJaTocados.add(chaveAlerta);
+          
           tocarAudio(voiceChannel, audioFinal);
         }
       }
@@ -96,12 +111,20 @@ function checkMapas(client) {
     const mapasNow = mapas.filter(m => m.horarios.includes(horaAtual));
     if (mapasNow.length > 0) {
       for (const voiceChannelId of mapChannels) {
+        // Criar chave única para spawn atual
+        const chaveAlerta = `${voiceChannelId}-${horaAtual}-spawn`;
+        
+        if (canaisJaTocados.has(chaveAlerta)) {
+          continue;
+        }
+        
         const voiceChannel = client.channels.cache.get(voiceChannelId);
         if (!voiceChannel) continue;
         
         const membersCount = voiceChannel.members.filter(m => !m.user.bot).size;
         if (membersCount === 0) continue;
         
+        canaisJaTocados.add(chaveAlerta);
         tocarAudio(voiceChannel, `./audios/mapas/${mapasNow[0].nome}.mp3`);
       }
       
