@@ -376,9 +376,12 @@ function checkBosses(client, time) {
     now = now.set({ hour, minute, second: 0, millisecond: 0 });
   }
 
+  // Adiciona 1 minuto para evitar disparar audio atrasado
+  now = now.plus({ minutes: 1 });
+
   // Verifica se precisa mudar o minuto
   const dataAtual = now.toFormat('yyyy-MM-dd');
-  if (minutoBossState.ultimaData !== dataAtual && now.hour >= 19) {
+  if (minutoBossState.ultimaData !== dataAtual && now.hour === 20) {
     // Incrementa o índice de minutos
     minutoBossState.idxMinuto = (minutoBossState.idxMinuto + 1) % minutosBoss.length;
     minutoBossState.ultimaData = dataAtual;
