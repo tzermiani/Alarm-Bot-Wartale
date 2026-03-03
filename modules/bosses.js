@@ -360,10 +360,26 @@ async function handleBossCommands(message, client) {
     return;
   }
   if(content.includes("!test-boss ")){
-    let time = content.replace("!test-boss ", "")
+    const partes = content.split(' ').slice(1); // Remove '!test-boss'
+    const nomeBoss = partes[0]?.toUpperCase();
+    const minutos = Number(partes[1]);
+    
     const canalDeVoz = message.member.voice.channel;
-    if (!canalDeVoz) return message.channel.send('Você precisa estar em um canal de voz!');
-    checkBosses(client , time)
+    if (!canalDeVoz) {
+      return message.channel.send('❌ Você precisa estar em um canal de voz!');
+    }
+    
+    if (!nomeBoss || isNaN(minutos) || minutos < 0) {
+      return message.channel.send('❌ Uso: `!test-boss NOME_BOSS MINUTOS`\nExemplo: `!test-boss TULLA 2`');
+    }
+    
+    const boss = bosses.find(b => b.nome.toUpperCase() === nomeBoss);
+    if (!boss) {
+      const nomesBosses = bosses.map(b => b.nome).join(', ');
+      return message.channel.send(`❌ Boss não encontrado. Bosses disponíveis: ${nomesBosses}`);
+    }
+    
+    testAlertaBoss(canalDeVoz, boss, minutos, message.channel);
     return;
   }
 }
@@ -475,6 +491,41 @@ function checkBosses(client, time) {
       canal.send(mensagem).then(m => setTimeout(() => m.delete(), 60000));
     }
   }
+}
+
+async function testAlertaBoss(canalDeVoz, boss, minutos, canalTexto) {
+  const now = DateTime.now().setZone('America/Sao_Paulo');
+  const idxMinuto = minutoBossState.idxMinuto;
+  const minuto = minutosBoss[(idxMinuto) % minutosBoss.length].toString().padStart(2, '0');
+  
+  // Simula o horário do boss adicionando os minutos informados
+  const horarioNascimento = now.plus({ minutes: minutos });
+  const horaCompleta = horarioNascimento.toFormat('HH:mm');
+  
+  // Informação para o canal de texto
+  const mensagemTeste = `🧪 **Teste de Alerta**\n` +
+    `Boss: **${boss.nome}**\n` +
+    `Tempo até nascimento: **${minutos} minuto(s)**\n` +
+    `Horário simulado: **${horaCompleta}**\n` +
+    `Canal de voz: **${canalDeVoz.name}**`;
+  
+  canalTexto.send(mensagemTeste);
+  
+  // Determina o label do aviso baseado nos minutos
+  let avisoLabel;
+  if (minutos === 5) {
+    avisoLabel = '5-minutos';
+  } else if (minutos === 2) {
+    avisoLabel = '2-minutos';
+  } else if (minutos === 0) {
+    avisoLabel = 'nascendo';
+  } else {
+    avisoLabel = `${minutos}-minutos`;
+  }
+  
+  // Toca o alerta no canal de voz
+  const bossesArray = [{ nome: boss.nome, horarios: [horaCompleta] }];
+  tocarAlertaComBosses(canalDeVoz, bossesArray, avisoLabel, minutos);
 }
 
 function responderProximosBosses(message) {
@@ -657,4 +708,4 @@ function checkHGTime(client) {
     });
 }
 
-module.exports = { checkBosses, handleBossCommands, responderProximosBosses, checkHGTime, getGuildConfig, updateGuildConfig, carregarGuilds, migrarAlarmsAntigos };
+module.exports = { checkBosses, handleBossCommands, responderProximosBosses, checkHGTime, getGuildConfig, updateGuildConfig, carregarGuilds, migrarAlarmsAntigos, testAlertaBoss };
