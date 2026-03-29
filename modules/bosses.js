@@ -397,7 +397,7 @@ function checkBosses(client, time) {
 
   // Verifica se precisa mudar o minuto
   const dataAtual = now.toFormat('yyyy-MM-dd');
-  if (minutoBossState.ultimaData !== dataAtual && now.hour === 20) {
+  if (minutoBossState.ultimaData !== dataAtual && now.hour === 19) {
     // Incrementa o índice de minutos
     minutoBossState.idxMinuto = (minutoBossState.idxMinuto + 1) % minutosBoss.length;
     minutoBossState.ultimaData = dataAtual;
